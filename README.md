@@ -23,6 +23,10 @@ KEY | DATATYPE | DESCRIPTION
 - **whitelistedGroups** : [Integer] Array of group ids which can create a channel if useGroupWhitelist is set to true (Format: 6,12,4,14).
 - **useGroupWhitelist** : [Boolean] Defines if plugin uses whitelistedGroups.
 - **channelName** : [String] Defines the name pattern of a new channel.
+- **channelCodecQuality** : [Integer] Defines the channel codec quality, 1 being worst, 10 being best.
+- **channelDescription** : [String] Defines the default description of the channel.
+- **channelDeleteDelaySeconds** : [Integer] Defines how long the channel should remain if empty.
+- **channelName** : [String] Defines the name pattern of a new channel.
 - **parentChannelId** : [Integer] Defines the parent channel which all dynamic channel will be a child of.
 - **createChannelId** : [Integer] Defines the channel which users have to join to create a channel.
 - **lobbyChannelId** : [Integer] Defines the lobby channel id.

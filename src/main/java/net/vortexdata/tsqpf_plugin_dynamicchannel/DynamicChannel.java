@@ -5,10 +5,11 @@ import com.github.theholywaffle.teamspeak3.api.event.*;
 import net.vortexdata.tsqpf.plugins.*;
 
 import java.util.*;
+import java.util.stream.*;
 
 public class DynamicChannel extends TeamspeakPlugin {
 
-    private int createChannelId;
+    private List<Integer> createChannelIds;
     private int parentChannelId;
     private int lobbyChannelId;
     private int channelOwnerChannelGroup;
@@ -29,13 +30,17 @@ public class DynamicChannel extends TeamspeakPlugin {
         getConfig().setDefault("channelDescription", "6");
         getConfig().setDefault("channelDeleteDelaySeconds", "120");
         getConfig().setDefault("parentChannelId", "0");
-        getConfig().setDefault("createChannelId", "0");
+        getConfig().setDefault("createChannelIds", "0");
         getConfig().setDefault("lobbyChannelId", "0");
         getConfig().setDefault("channelOwnerChannelGroup", "0");
         getConfig().saveAll();
 
         channelOwnerChannelGroup = Integer.parseInt(getConfig().readValue("channelOwnerChannelGroup"));
-        createChannelId = Integer.parseInt(getConfig().readValue("createChannelId"));
+
+        createChannelIds = Arrays.stream(getConfig().readValue("createChannelIds").split(","))
+                .map(Integer::parseInt)
+                .collect(Collectors.toList());
+
         parentChannelId = Integer.parseInt(getConfig().readValue("parentChannelId"));
         lobbyChannelId = Integer.parseInt(getConfig().readValue("lobbyChannelId"));
         useGroupWhitelist = Boolean.parseBoolean(getConfig().readValue("useGroupWhitelist"));
@@ -61,7 +66,7 @@ public class DynamicChannel extends TeamspeakPlugin {
 
     @Override
     public void onClientMoved(ClientMovedEvent clientMovedEvent) {
-        if (clientMovedEvent.getTargetChannelId() == createChannelId) {
+        if (createChannelIds.contains(clientMovedEvent.getTargetChannelId())) {
             if (useGroupWhitelist) {
                 boolean hasPermissions = false;
                 int[] clientGroups = getAPI().getClientInfo(clientMovedEvent.getClientId()).getServerGroups();

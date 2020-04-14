@@ -30,6 +30,7 @@ KEY | DATATYPE | DESCRIPTION
 - **parentChannelId** : [Integer] Defines the parent channel which all dynamic channel will be a child of.
 - **createChannelId** : [Integer] Defines the channel which users have to join to create a channel.
 - **lobbyChannelId** : [Integer] Defines the lobby channel id.
+- **moveClientIfChannelExists** : [Boolean] If the user joins a creation channel and already has a channel, the framework will move him to his channel.
 
 ## ⚙️ Channel Name Placeholder
 

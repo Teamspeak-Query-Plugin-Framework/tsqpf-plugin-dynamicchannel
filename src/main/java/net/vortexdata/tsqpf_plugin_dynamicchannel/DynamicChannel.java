@@ -14,25 +14,29 @@ public class DynamicChannel extends TeamspeakPlugin {
     private int lobbyChannelId;
     private int channelOwnerChannelGroup;
     private boolean useGroupWhitelist;
+    private boolean moveClientIfChannelExists;
     private int[] whitelistedGroups;
+    private ChannelCache channelCache;
 
     @Override
     public void onEnable() {
+        channelCache = new ChannelCache(getAPI(), getLogger());
         getConfig().setDefault("messageCreationRunning", "Creating channel...");
         getConfig().setDefault("messageCreationFailed", "Sorry, but your channel could not be created as an unknown error occurred. Please contact the server administration.");
         getConfig().setDefault("messageCreationFailedExisting", "Sorry, but it looks like you already have a channel.");
         getConfig().setDefault("messageCreationFailedPermission", "Sorry, but it looks like you don't have permission to create a channel.");
-        getConfig().setDefault("messageCreationSuccess", "Channel created, moving you now...");
+        getConfig().setDefault("messageCreationSuccess", "CachedChannel created, moving you now...");
         getConfig().setDefault("whitelistedGroups", "7");
         getConfig().setDefault("useGroupWhitelist", "false");
-        getConfig().setDefault("channelName", "%clientNickname%'s Channel");
+        getConfig().setDefault("channelName", "%clientNickname%'s CachedChannel");
         getConfig().setDefault("channelCodecQuality", "6");
-        getConfig().setDefault("channelDescription", "6");
+        getConfig().setDefault("channelDescription", "This is a dynamic channel.");
         getConfig().setDefault("channelDeleteDelaySeconds", "120");
         getConfig().setDefault("parentChannelId", "0");
         getConfig().setDefault("createChannelIds", "0");
         getConfig().setDefault("lobbyChannelId", "0");
         getConfig().setDefault("channelOwnerChannelGroup", "0");
+        getConfig().setDefault("moveClientIfChannelExists", "true");
         getConfig().saveAll();
 
         channelOwnerChannelGroup = Integer.parseInt(getConfig().readValue("channelOwnerChannelGroup"));
@@ -44,6 +48,7 @@ public class DynamicChannel extends TeamspeakPlugin {
         parentChannelId = Integer.parseInt(getConfig().readValue("parentChannelId"));
         lobbyChannelId = Integer.parseInt(getConfig().readValue("lobbyChannelId"));
         useGroupWhitelist = Boolean.parseBoolean(getConfig().readValue("useGroupWhitelist"));
+        moveClientIfChannelExists = Boolean.parseBoolean(getConfig().readValue("moveClientIfChannelExists"));
 
         if (useGroupWhitelist) {
             try {
@@ -78,21 +83,44 @@ public class DynamicChannel extends TeamspeakPlugin {
                 }
 
                 if (hasPermissions) {
-                    createChannel(clientMovedEvent);
+                    runCheck(clientMovedEvent);
                 } else {
                     getAPI().sendPrivateMessage(getAPI().getClientInfo(clientMovedEvent.getClientId()).getId(), getConfig().readValue("messageCreationFailedPermission"));
                 }
             } else {
-                createChannel(clientMovedEvent);
+                runCheck(clientMovedEvent);
             }
         }
     }
 
+    @Override
+    public void onChannelDeleted(ChannelDeletedEvent channelDeletedEvent) {
+        super.onChannelDeleted(channelDeletedEvent);
+        channelCache.onChannelDelete(channelDeletedEvent);
+    }
+
+    private void runCheck(ClientMovedEvent cme) {
+        if (!channelCache.doesClientHaveChannel(getAPI().getClientInfo(cme.getClientId()).getUniqueIdentifier())) {
+            createChannel(cme);
+        } else {
+            if (moveClientIfChannelExists) {
+                try {
+                    getAPI().moveClient(cme.getClientId(), channelCache.getChannelByOwner(getAPI().getClientInfo(cme.getClientId()).getUniqueIdentifier()).getChannelId());
+                } catch (Exception e) {
+                    getAPI().sendPrivateMessage(getAPI().getClientInfo(cme.getClientId()).getId(), getConfig().readValue("messageCreationFailed"));
+                }
+            }
+            getAPI().sendPrivateMessage(getAPI().getClientInfo(cme.getClientId()).getId(), getConfig().readValue("messageCreationFailedExisting"));
+        }
+    }
+
     private int createChannel(ClientMovedEvent cme) {
+
+        String dynchaUUID = UUID.randomUUID().toString();
         HashMap<ChannelProperty, String> channelProperties = new HashMap<>();
         channelProperties.put(ChannelProperty.CHANNEL_FLAG_TEMPORARY, "1");
         channelProperties.put(ChannelProperty.CHANNEL_DELETE_DELAY, getConfig().readValue("channelDeleteDelaySeconds"));
-        channelProperties.put(ChannelProperty.CHANNEL_DESCRIPTION, getConfig().readValue("channelDescription"));
+        channelProperties.put(ChannelProperty.CHANNEL_DESCRIPTION, getConfig().readValue("channelDescription") + "\n\n" + Utils.UUID_PREFIX + dynchaUUID);
         channelProperties.put(ChannelProperty.CHANNEL_CODEC_QUALITY, getConfig().readValue("channelCodecQuality"));
         channelProperties.put(ChannelProperty.CPID, getConfig().readValue("parentChannelId"));
 
@@ -100,6 +128,7 @@ public class DynamicChannel extends TeamspeakPlugin {
 
         try {
             newChannelId = getAPI().createChannel(PatternParser.parseMessage(getConfig().readValue("channelName"), cme, getAPI()), channelProperties);
+            channelCache.registerNewChannel(dynchaUUID, newChannelId, getAPI().getClientInfo(cme.getClientId()).getUniqueIdentifier());
             getAPI().sendPrivateMessage(getAPI().getClientInfo(cme.getClientId()).getId(), getConfig().readValue("messageCreationSuccess"));
             getAPI().moveClient(getAPI().getClientInfo(cme.getClientId()).getId(), newChannelId);
             // Move API back to default channel
